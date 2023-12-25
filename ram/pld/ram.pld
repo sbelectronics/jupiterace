@@ -1,0 +1,47 @@
+/* Jupiter Ace Ram Expansion
+ *
+ * Test by executing the following. Should print 0. Will print 16384 if RAM not detected.
+ * 15384 @ u. 
+ */
+
+Name ram;
+Partno G22V10#1;
+Revision;
+Date 09/1/2023;
+Designer Scott Baker;
+Company ;
+Location ;
+Assembly 80198 H8 CPU BOARD;
+Device G22V10;
+
+/* Inputs: */
+Pin 1 = !MREQ;
+Pin 2 = A15;
+Pin 3 = A14;
+Pin 4 = A7;
+Pin 5 = A6;
+Pin 6 = A5;
+Pin 7 = A4;
+Pin 8 = A3;
+Pin 9 = !M1;
+Pin 10 = !WR;
+Pin 11 = !RD;
+Pin 13 = !IORQ;
+
+/* Outputs:   */
+Pin 23 = !MR;
+Pin 22 = !MW;
+Pin 21 = !IOR;
+Pin 20 = !IOW;
+Pin 19 = !RFSH;
+Pin 18 = !RESET;
+Pin 17 = !NC1;
+Pin 16 = !NC2;
+Pin 15 = !D0;
+Pin 14 = !BANK;
+
+MADDR = A15 # A14; /* the upper 48K A15=A14 = 01, 10, or 11 */
+
+BANK = 'b'0;
+MR = MREQ & MADDR & RD;
+MW = MREQ & MADDR & WR;
