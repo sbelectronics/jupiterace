@@ -67,11 +67,11 @@ def pushline(super, line):
 
     try:
         super.take_bus()
-        buf = super.mem_read(0x3C24) + (super.mem_read(0x3C25)<<8)  - 0x400
+        bufstart = super.mem_read(0x3C24) + (super.mem_read(0x3C25)<<8)  - 0x400
+
+        buf = bufstart
 
         super.mem_write(buf,0)
-        buf += 1
-        super.mem_write(buf,ord(' '))
         buf += 1
 
         for k in line:
@@ -79,6 +79,9 @@ def pushline(super, line):
             buf += 1
 
         super.mem_write(buf,0)
+
+        super.mem_write_word(0x3C20, bufstart+len(line)+1)  # end of current logical line
+        super.mem_write_word(0x3C22, bufstart+len(line)+2)
 
         super.mem_write(0x3c28, 0x21)
     finally:
