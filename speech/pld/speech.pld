@@ -1,0 +1,49 @@
+/* Jupiter Ace Speech Board 
+ */
+
+Name speech;
+Partno G22V10#1;
+Revision;
+Date 09/1/2023;
+Designer Scott Baker;
+Company ;
+Location ;
+Assembly Jupiter Ace Speech Board;
+Device G22V10;
+
+/* Inputs: */
+Pin 1 = !MREQ;
+Pin 2 = A15;
+Pin 3 = A14;
+Pin 4 = A7;
+Pin 5 = A6;
+Pin 6 = A5;
+Pin 7 = A4;
+Pin 8 = A3;
+Pin 9 = !M1;
+Pin 10 = !WR;
+Pin 11 = !RD;
+Pin 13 = !IOREQ;
+
+/* Inputs/Outputs: */
+Pin 23 = A2;
+Pin 22 = A1;
+Pin 21 = A0;
+Pin 20 = !ALD;
+Pin 19 = !RFSH;
+Pin 18 = !RESET;
+Pin 17 = !LRQ;
+Pin 16 = SBY;
+Pin 15 = D0;
+Pin 14 = !INT;
+
+FIELD ADDR = [A7..A0];
+
+PHON_CS = (ADDR:0x45);
+STAT_CS = (ADDR:0x47);
+
+ALD = IOREQ & !M1 & PHON_CS & WR;
+
+D0 = LRQ;
+D0.OE = IOREQ & !M1 & STAT_CS & RD;
+
