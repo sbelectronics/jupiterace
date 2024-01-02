@@ -56,14 +56,29 @@ def fill(super, addr, size, value):
     finally:
         super.mem_write_end()
 
+def screendump(super):
+    addr = 0x2000;
+    for i in range(0,768):
+        b = super.mem_read(addr)
+        print(chr(b),end="")
+        if (i+1)%32 == 0:
+            print()
+        addr+=1
+    print()
+
 def pushline(super, line):
+    time.sleep(0.001)
+
     ready = False
     while not ready:
         try:
             super.take_bus()
-            ready = (super.mem_read(0x3C28) & 0x20) == 0
+            # just checking 3C28 is probably sufficient...
+            ready = ((super.mem_read(0x3C28) & 0x20) == 0) and (super.mem_read_word(0x3C20)==0x26E1) and (super.mem_read_word(0x3C22)==0x26E2)
         finally:
             super.release_bus(reset=True)
+
+    time.sleep(0.001)
 
     try:
         super.take_bus()
@@ -85,7 +100,7 @@ def pushline(super, line):
 
         super.mem_write(0x3c28, 0x21)
     finally:
-        super.release_bus(reset=True)  
+        super.release_bus(reset=True)
 
 
 def pushfile(super, fn):
@@ -180,6 +195,116 @@ def clearkeys(super):
     super.mem_write(startbuf+12,ord('x'))
     super.mem_write(startbuf+13,0)
 
+def patch(buf, pat, replace):
+    for i in range(0, len(buf)):
+        if i+len(pat)>=len(buf):
+            return
+        match = True;
+        for j in range(0,len(pat)):
+            if buf[i+j]!=pat[j]:
+                match = False
+        if match:
+            print("patch at %X" % i)
+            for j in range(0,len(pat)):
+                buf[i+j] = replace[j]
+
+def loadtap(super, fn, patchudg):
+    b = open(fn,"rb").read()
+
+    headerLen = b[0] | b[1]<<8
+    if (headerLen!=26):
+        printf("Invalid header len: %d" % headerLen);
+        sys.exit(-1)
+
+    fType = b[2];
+    fLen = b[13] | b[14]<<8
+    startAddr = b[15] | b[16]<<8
+    curWord = b[17] | b[18]<<8
+    current = b[19] | b[20]<<8
+    context = b[21] | b[22]<<8
+    voclnk = b[23] | b[24]<<8
+    stkbot = b[25] | b[26]<<8
+
+    print("ftype: %X" % fType)
+    print("flen: %X" % fLen)
+    print("startAddr: %X" % startAddr)
+    print("curWord: %X" % curWord)
+    print("current: %X" % current)
+    print("context: %X" % context)
+    print("voclnk: %X" % voclnk)
+    print("stkbot: %X" % stkbot)
+
+    addr = startAddr
+    offset = 28
+    while (offset<=len(b)):
+        blkLen = b[offset] | b[offset+1]<<8
+        offset += 2
+        print("blklen: %X" % blkLen)
+
+        blk = bytearray(b[offset:(offset+blkLen)])
+        if patchudg:
+            # modify loaded code to use the version of the font table that does not wait for
+            # video blank. This fixes a memory corruption issue on my homebuilt ACE.
+            patch(blk, bytes([0x11,0x10,0xff,0x2b,0xd2,0x0d]), bytes([0x11,0x10,0xff,0x27,0xd2,0x0d]))
+            patch(blk, bytes([0x11,0x10,0x00,0x2c,0xd2,0x0d]), bytes([0x11,0x10,0x00,0x28,0xd2,0x0d]))
+
+        super.mem_write_start(addr)
+        for i in range(0, blkLen):
+            if i<len(blk):
+                super.mem_write_fast(addr+i, blk[i])
+        super.mem_write_end()
+
+        offset+=blkLen+1
+        addr += blkLen
+
+    super.mem_write_word(0x3C31, current)
+    super.mem_write_word(0x3C33, context)
+    super.mem_write_word(0x3C35, voclnk)
+    super.mem_write_word(0x3C37, stkbot)
+
+    super.mem_write_word(current, curWord)
+
+def process_ace(src):
+    # decompress a .ace file
+    dest = bytearray()
+    i = 0
+    while (i<len(src)):
+        if src[i] == 0xED:
+            i+=1
+            count = src[i]
+            if count == 0x00:
+                return dest
+            i+=1
+            val = src[i]
+            for j in range(0,count):
+                dest.append(val)
+        else:
+            dest.append(src[i])
+        i+=1
+    return dest
+
+def loadace(super, fn, patchudg):
+    b = open(fn,"rb").read()
+    b = process_ace(b)
+    if patchudg:
+        # modify loaded code to use the version of the font table that does not wait for
+        # video blank. This fixes a memory corruption issue on my homebuilt ACE.
+        patch(b, bytes([0x11,0x10,0xff,0x2b,0xd2,0x0d]), bytes([0x11,0x10,0xff,0x27,0xd2,0x0d]))
+        patch(b, bytes([0x11,0x10,0x00,0x2c,0xd2,0x0d]), bytes([0x11,0x10,0x00,0x28,0xd2,0x0d]))
+    addr = 0x2000
+    super.mem_write_start(addr)
+    for v in b:
+        if (addr>=0x2400) and (addr<=0x27FF):
+            super.mem_write_fast(addr-0x400, v)
+        elif (addr>=0x2C00) and (addr<=0x2FFF):
+            super.mem_write_fast(addr-0x400, v)
+        else:
+            super.mem_write_fast(addr,v)
+        addr += 1
+    super.mem_write_end()
+
+    print("loaded %d bytes" % len(b))
+
 def main():
     parser = OptionParser(usage="supervisor [options] command",
             description="Commands: ...")
@@ -210,6 +335,8 @@ def main():
          help="multiplier for delay", type="int", default=None)
     parser.add_option("-S", "--SVAL", dest="stringval",
          help="stringvalue", default=None, type="string")
+    parser.add_option("-U", "--patchudg", dest="patchudg",
+         help="patch udg", action="store_true", default=False)
 
     #parser.disable_interspersed_args()
 
@@ -284,6 +411,30 @@ def main():
         finally:
             if not options.norelease:
                 super.release_bus(reset=True)
+
+    elif (cmd=="screendump"):
+        try:
+            super.take_bus()
+            screendump(super)
+        finally:
+            if not options.norelease:
+                super.release_bus(reset=True)
+
+    elif (cmd=="loadtap"):
+        try:
+            super.take_bus()
+            loadtap(super, options.filename, options.patchudg)
+        finally:
+            if not options.norelease:
+                super.release_bus(reset=True)
+
+    elif (cmd=="loadace"):
+        try:
+            super.take_bus()
+            loadace(super, options.filename, options.patchudg)
+        finally:
+            if not options.norelease:
+                super.release_bus(reset=True)                 
 
     elif (cmd=="pushfile"):
         pushfile(super, options.filename)
@@ -452,6 +603,9 @@ def main():
             count = count + 1
             if (count % 100) == 0:
                 print("count: %d" % count)
+
+    else:
+        print("Unknown command: %s" % cmd)
 
 
 if __name__=="__main__":
