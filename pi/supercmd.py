@@ -56,7 +56,7 @@ def fill(super, addr, size, value):
     finally:
         super.mem_write_end()
 
-def screendump(super):
+def screendump_old(super):
     addr = 0x2000;
     for i in range(0,768):
         b = super.mem_read(addr)
@@ -66,17 +66,41 @@ def screendump(super):
         addr+=1
     print()
 
-def pushline(super, line):
+def screenget(super):
+    screen = ""
+    addr = 0x2000
+    for i in range(0,768):
+        b = super.mem_read(addr)
+        screen = screen + chr(b)
+        addr+=1
+    return screen
+
+def screenprint(screen):
+    i=0
+    l=""
+    for c in screen:
+        l=l+c
+        if (i+1)%32 == 0:
+            print(l)
+            l=""
+        i = i + 1
+    print(l)
+
+def screendump(super):
+    screenprint(screenget(super))
+    
+def pushline(super, line, nowait=False):
     time.sleep(0.001)
 
-    ready = False
-    while not ready:
-        try:
-            super.take_bus()
-            # just checking 3C28 is probably sufficient...
-            ready = ((super.mem_read(0x3C28) & 0x20) == 0) and (super.mem_read_word(0x3C20)==0x26E1) and (super.mem_read_word(0x3C22)==0x26E2)
-        finally:
-            super.release_bus(reset=True)
+    if (not nowait):
+        ready = False
+        while not ready:
+            try:
+                super.take_bus()
+                # just checking 3C28 is probably sufficient...
+                ready = ((super.mem_read(0x3C28) & 0x20) == 0) and (super.mem_read_word(0x3C20)==0x26E1) and (super.mem_read_word(0x3C22)==0x26E2)
+            finally:
+                super.release_bus(reset=True)
 
     time.sleep(0.001)
 
@@ -304,6 +328,30 @@ def loadace(super, fn, patchudg):
     super.mem_write_end()
 
     print("loaded %d bytes" % len(b))
+
+def interact(super):
+    print ("%c[2J" % 0x1B, end='')
+    lastScreen = ""
+    while True:
+        while True:
+            print ("%c[%d;%dH" % (0x1B, 0, 0), end='')
+            try:
+                super.take_bus()
+                screen = screenget(super)
+            finally:
+                super.release_bus(reset=False)
+            if screen==lastScreen:
+                break
+            screenprint(screen)
+            lastScreen=screen
+            time.sleep(0.1)
+        print ("%c[%d;%dH" % (0x1B, 24, 0), end='')
+        print("> ", end="")
+        print ("%c[0J" % 0x1B, end='')
+        line = input("")
+        line = line.strip()
+        pushline(super, line, nowait=True)
+        time.sleep(0.25)
 
 def main():
     parser = OptionParser(usage="supervisor [options] command",
@@ -603,6 +651,9 @@ def main():
             count = count + 1
             if (count % 100) == 0:
                 print("count: %d" % count)
+
+    elif (cmd=="interact"):
+        interact(super)
 
     else:
         print("Unknown command: %s" % cmd)
