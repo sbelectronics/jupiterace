@@ -38,3 +38,5 @@ Writing any even numbered port will move the speaker outward.
 | 87        | 57    | smbaker RTC digits 2, 3 |
 | 89        | 59    | smbaker RTC digits 4, 5 |
 | 91        | 5A    | smbaker RTC blanking |
+| 65533     | FFFD  | AMI AY-3-8910 register select (WR), AMI AY-3-8912 register read (RD) |
+| 49149     | BFFD  | AMI AY-3-8910 register write |
