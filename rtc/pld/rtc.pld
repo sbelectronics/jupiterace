@@ -1,0 +1,57 @@
+/* Jupiter Ace Speech Board 
+ */
+
+Name rtc;
+Partno G22V10#1;
+Revision;
+Date 09/1/2023;
+Designer Scott Baker;
+Company ;
+Location ;
+Assembly Jupiter Ace Speech Board;
+Device G22V10;
+
+/* Inputs: */
+Pin 1 = !RESET;
+Pin 2 = A15;
+Pin 3 = A14;
+Pin 4 = A7;
+Pin 5 = A6;
+Pin 6 = A5;
+Pin 7 = A4;
+Pin 8 = A3;
+Pin 9 = !M1;
+Pin 10 = !WR;
+Pin 11 = !RD;
+Pin 13 = !IOREQ;
+
+/* Inputs/Outputs: */
+Pin 23 = A2;
+Pin 22 = A1;
+Pin 21 = A0;
+Pin 20 = !RTC_IOR;
+Pin 19 = !RTC_IOW;
+Pin 18 = !LATBL;
+Pin 17 = RTC_ALE;
+Pin 16 = !LAT01;
+Pin 15 = !LAT23;
+Pin 14 = !LAT45;
+
+FIELD ADDR = [A7..A0];
+
+RTC_DATA_CS = (ADDR:0x51);
+RTC_ADDR_CS = (ADDR:0x53);
+
+DISP01_CS = (ADDR:0x55);
+DISP23_CS = (ADDR:0x57);
+DISP45_CS = (ADDR:0x59);
+DISPBL_CS = (ADDR:0x5B);
+
+RTC_ALE = IOREQ & !M1 & RTC_ADDR_CS & WR;
+RTC_IOW = IOREQ & !M1 & RTC_DATA_CS & WR;
+RTC_IOR = IOREQ & !M1 & RTC_DATA_CS & RD;
+
+LAT01 = IOREQ & !M1 & DISP01_CS & WR;
+LAT23 = IOREQ & !M1 & DISP23_CS & WR;
+LAT45 = IOREQ & !M1 & DISP45_CS & WR;
+LATBL = IOREQ & !M1 & DISPBL_CS & WR;
